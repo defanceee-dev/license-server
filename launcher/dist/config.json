@@ -1,0 +1,6 @@
+{
+  "api_base_url": "http://127.0.0.1:8000",
+  "target_executable": "C:/Users/Defance/Desktop/ТвичБот/spambot-ex (1).exe",
+  "session_file": "license_session.json",
+  "server_url": "https://license-server-ytau.onrender.com"
+}
