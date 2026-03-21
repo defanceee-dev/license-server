@@ -1,3 +1,7 @@
+import uuid
+from datetime import datetime, timedelta
+
+licenses = {}
 from fastapi import FastAPI, HTTPException
 
 from db import init_db
