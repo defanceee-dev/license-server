@@ -33,9 +33,40 @@ def api_validate_license(payload: LicenseValidateRequest):
     return validate_license(payload.license_key, payload.device_id)
 
 
+from fastapi import Request
+
 @app.post("/api/v1/admin/licenses")
-def api_create_license(payload: CreateLicenseRequest):
-    return create_license(payload.days, payload.plan, payload.notes)
+async def create_license(request: Request):
+    data = await request.json()
+
+    days = data.get("days", 30)
+    plan = data.get("plan", "basic")
+    user_id = str(data.get("user_id"))
+
+    # 👉 проверка: есть ли уже ключ
+    for license in licenses.values():
+        if license.get("user_id") == user_id:
+            return license
+
+    # 👉 создаём новый
+    license_key = str(uuid.uuid4()).upper()
+    expires_at = datetime.utcnow() + timedelta(days=days)
+
+    license_data = {
+        "license_key": license_key,
+        "plan": plan,
+        "status": "active",
+        "device_id": None,
+        "user_id": user_id,
+        "created_at": datetime.utcnow().isoformat(),
+        "expires_at": expires_at.isoformat(),
+        "last_check_at": None,
+        "notes": None
+    }
+
+    licenses[license_key] = license_data
+
+    return license_data
 
 
 @app.get("/api/v1/admin/licenses")
