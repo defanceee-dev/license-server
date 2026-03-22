@@ -1,12 +1,13 @@
 import uuid
 from datetime import datetime, timedelta
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 from db import init_db
 from license_service import (
     extend_license,
-    list_licenses,
     revoke_license,
     validate_license,
 )
@@ -18,8 +19,14 @@ from schemas import (
 
 app = FastAPI(title="Desktop Licensing Starter API", version="1.0.0")
 
-# 🔥 временное хранилище лицензий (анти-дубль)
+# временное хранилище лицензий
 licenses = {}
+
+
+class CreateLicenseRequest(BaseModel):
+    user_id: int
+    duration_days: int = 30
+    plan: str = "basic"
 
 
 @app.on_event("startup")
@@ -38,27 +45,19 @@ def api_validate_license(payload: LicenseValidateRequest):
 
 
 @app.post("/api/v1/admin/licenses")
-async def create_license(request: Request):
-    data = await request.json()
+def api_create_license(payload: CreateLicenseRequest):
+    user_id = str(payload.user_id)
+    days = int(payload.duration_days)
+    plan = payload.plan
 
-    days = data.get("days", 30)
-    plan = data.get("plan", "basic")
-    user_id = data.get("user_id")
-
-    # ❗ защита от кривых данных
-    if not user_id:
-        raise HTTPException(status_code=400, detail="user_id is required")
-
-    user_id = str(user_id)
-
-    # 🔥 проверка: уже есть ключ у пользователя
+    # проверка: уже есть ключ у пользователя
     for lic in licenses.values():
         if lic.get("user_id") == user_id:
             return lic
 
-    # 🔥 создаём новый ключ
+    # создаём новый ключ
     license_key = str(uuid.uuid4()).upper()
-    expires_at = datetime.utcnow() + timedelta(days=int(days))
+    expires_at = datetime.utcnow() + timedelta(days=days)
 
     license_data = {
         "license_key": license_key,
@@ -72,7 +71,6 @@ async def create_license(request: Request):
     }
 
     licenses[license_key] = license_data
-
     return license_data
 
 
