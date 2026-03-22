@@ -1,32 +1,21 @@
-import uuid
-from datetime import datetime, timedelta
-from typing import Optional
-
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 
 from db import init_db
 from license_service import (
+    create_license,
     extend_license,
+    list_licenses,
     revoke_license,
     validate_license,
 )
 from schemas import (
+    CreateLicenseRequest,
     ExtendLicenseRequest,
     LicenseValidateRequest,
     LicenseValidateResponse,
 )
 
 app = FastAPI(title="Desktop Licensing Starter API", version="1.0.0")
-
-# временное хранилище лицензий
-licenses = {}
-
-
-class CreateLicenseRequest(BaseModel):
-    user_id: int
-    duration_days: int = 30
-    plan: str = "basic"
 
 
 @app.on_event("startup")
@@ -44,39 +33,19 @@ def api_validate_license(payload: LicenseValidateRequest):
     return validate_license(payload.license_key, payload.device_id)
 
 
+# 🔥 ВАЖНО — теперь используем нормальный create_license
 @app.post("/api/v1/admin/licenses")
 def api_create_license(payload: CreateLicenseRequest):
-    user_id = str(payload.user_id)
-    days = int(payload.duration_days)
-    plan = payload.plan
-
-    # проверка: уже есть ключ у пользователя
-    for lic in licenses.values():
-        if lic.get("user_id") == user_id:
-            return lic
-
-    # создаём новый ключ
-    license_key = str(uuid.uuid4()).upper()
-    expires_at = datetime.utcnow() + timedelta(days=days)
-
-    license_data = {
-        "license_key": license_key,
-        "plan": plan,
-        "status": "active",
-        "device_id": None,
-        "user_id": user_id,
-        "created_at": datetime.utcnow().isoformat(),
-        "expires_at": expires_at.isoformat(),
-        "last_check_at": None,
-    }
-
-    licenses[license_key] = license_data
-    return license_data
+    return create_license(
+        days=payload.days,
+        plan=payload.plan,
+        notes=payload.notes,
+    )
 
 
 @app.get("/api/v1/admin/licenses")
 def api_list_licenses():
-    return {"items": list(licenses.values())}
+    return {"items": list_licenses()}
 
 
 @app.post("/api/v1/admin/licenses/{license_key}/extend")
